@@ -23,9 +23,8 @@
         }
         h1 {
             font-size: 1.2rem;
-            margin: 5px 0 5px 0;
+            margin: 5px 0;
             color: #fff;
-            text-align: center;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -69,40 +68,68 @@
             border-radius: 8px;
             border: 1px solid #333;
         }
-        .board-container {
-            position: relative;
-            background: #2a2a2a;
-            padding: 4px;
-            border-radius: 6px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        /* 座標を含めた盤面コンテナ */
+        .board-wrapper {
+            background: #242424;
+            padding: 8px 12px 6px 6px;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.6);
             margin-bottom: 10px;
+            border: 1px solid #333;
+        }
+        .board-middle {
+            display: flex;
+            align-items: stretch;
+        }
+        .rank-labels {
+            display: grid;
+            padding-right: 6px;
+            font-size: 0.7rem;
+            font-weight: bold;
+            color: #888;
+            text-align: center;
+        }
+        .rank-labels div {
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         .board {
-    display: grid;
-    grid-template-columns: repeat(8, 1fr);
-    grid-template-rows: repeat(8, 1fr); /* 行の高さも均等に固定 */
-    gap: 2px;
-    width: 88vw;
-    max-width: 360px;
-    height: 88vw;
-    max-height: 360px;
-}
-.cell {
-    background-color: #b58863;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.8rem;
-    cursor: pointer;
-    position: relative;
-    border-radius: 2px;
-    aspect-ratio: 1 / 1; /* セルを強制的に正方形にする */
-    overflow: hidden;    /* はみ出しを防ぐ */
-}
+            display: grid;
+            gap: 2px;
+            width: 80vw;
+            max-width: 340px;
+            height: 80vw;
+            max-height: 340px;
+            background-color: #1a1a1a;
+            padding: 2px;
+            border-radius: 4px;
         }
-        .cell.light { background-color: #f0d9b5; }
-        .cell.dark { background-color: #b58863; }
-        
+        .file-labels {
+            display: grid;
+            padding-left: 18px;
+            padding-top: 5px;
+            font-size: 0.7rem;
+            font-weight: bold;
+            color: #888;
+            text-align: center;
+        }
+        .cell {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.6rem;
+            cursor: pointer;
+            position: relative;
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        .cell.light {
+            background-color: #f0d9b5;
+        }
+        .cell.dark {
+            background-color: #b58863;
+        }
         .cell.visited {
             background-color: #4a6b82 !important;
             color: #fff;
@@ -113,8 +140,8 @@
         }
         .cell.valid-move::after {
             content: '';
-            width: 12px;
-            height: 12px;
+            width: 11px;
+            height: 11px;
             background-color: #2a9d8f;
             border-radius: 50%;
             position: absolute;
@@ -134,9 +161,6 @@
             left: 3px;
             color: rgba(255,255,255,0.9);
             font-weight: bold;
-        }
-        .cell.light .number {
-            color: rgba(0,0,0,0.7);
         }
         .btn-container {
             display: flex;
@@ -164,7 +188,8 @@
             background-color: #2a9d8f;
         }
         #message {
-            margin-top: 8px;
+            margin-top: 6px;
+            margin-bottom: 8px;
             font-size: 0.85rem;
             font-weight: bold;
             color: #ffb703;
@@ -188,8 +213,12 @@
         <div>自己ベスト: <span id="best-score">0</span>/<span id="total-cells-best">64</span></div>
     </div>
 
-    <div class="board-container">
-        <div id="board" class="board"></div>
+    <div class="board-wrapper">
+        <div class="board-middle">
+            <div id="rank-labels" class="rank-labels"></div>
+            <div id="board" class="board"></div>
+        </div>
+        <div id="file-labels" class="file-labels"></div>
     </div>
 
     <div id="message">好きなマスをタップしてスタート</div>
@@ -211,6 +240,8 @@
         let gameOver = false;
 
         const boardEl = document.getElementById('board');
+        const rankLabelsEl = document.getElementById('rank-labels');
+        const fileLabelsEl = document.getElementById('file-labels');
         const stepCountEl = document.getElementById('step-count');
         const bestScoreEl = document.getElementById('best-score');
         const totalCellsEl = document.getElementById('total-cells');
@@ -239,9 +270,33 @@
             initGame();
         }
 
+        function renderCoordinates() {
+            rankLabelsEl.style.gridTemplateRows = `repeat(${BOARD_SIZE}, 1fr)`;
+            fileLabelsEl.style.gridTemplateColumns = `repeat(${BOARD_SIZE}, 1fr)`;
+            rankLabelsEl.innerHTML = '';
+            fileLabelsEl.innerHTML = '';
+
+            // 縦の数字（チェス表記に合わせて上から8〜1、または6〜1）
+            for (let i = BOARD_SIZE; i >= 1; i--) {
+                const div = document.createElement('div');
+                div.textContent = i;
+                rankLabelsEl.appendChild(div);
+            }
+
+            // 横のアルファベット（A〜H、またはA〜F）
+            const letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+            for (let i = 0; i < BOARD_SIZE; i++) {
+                const div = document.createElement('div');
+                div.textContent = letters[i];
+                fileLabelsEl.appendChild(div);
+            }
+        }
+
         function initGame() {
             boardEl.style.gridTemplateColumns = `repeat(${BOARD_SIZE}, 1fr)`;
-            boardEl.innerHTML = '';
+            boardEl.style.gridTemplateRows = `repeat(${BOARD_SIZE}, 1fr)`;
+            renderCoordinates();
+
             board = Array(BOARD_SIZE).fill(0).map(() => Array(BOARD_SIZE).fill(0));
             
             currentR = -1;
@@ -339,8 +394,6 @@
             let isValid = validMoves.some(m => m[0] === r && m[1] === c);
 
             if (isValid) {
-                let prevR = currentR;
-                let prevC = currentC;
                 currentR = r;
                 currentC = c;
                 stepCount++;
@@ -385,7 +438,7 @@
             if (historyStack.length <= 1 || gameOver) return;
             
             let last = historyStack.pop();
-            board[last.r][last.lastC || last.c] = 0;
+            board[last.r][last.c] = 0;
             
             let prev = historyStack[historyStack.length - 1];
             currentR = prev.r;
