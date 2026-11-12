@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Knight's Tour - オフライン版</title>
+  <style>
+    /* 
+       Base & Theme Variables (High-Contrast Dark Slate & Amber Chess Theme)
+        */
+    :root {
+      --bg-color: #12151a;
+      --surface-color: #1c2128;
+      --surface-hover: #262c36;
+      --border-color: #30363d;
+      --text-primary: #f0f6fc;
+      --text-secondary: #8b949e;
+
+  /* Board Colors */
+  --sq-light: #e2d9c8;
+  --sq-dark: #7a8b99;
+  --sq-visited-light: #c8beac;
+  --sq-visited-dark: #60707d;
+  
+  /* Highlights & Accents */
+  --accent-primary: #d97706; /* Warm Amber/Gold */
+  --accent-hover: #b45309;
+  --valid-dot: rgba(16, 185, 129, 0.85); /* Emerald Green */
+  --valid-ring: rgba(16, 185, 129, 0.35);
+  --hint-color: #3b82f6; /* Bright Blue */
+  --current-bg: #f59e0b;
+  --danger-color: #ef4444;
+  --success-color: #10b981;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  background-color: var(--bg-color);
+  color: var(--text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Hiragino Sans", "Noto Sans JP", sans-serif;
+  overflow: hidden; /* Prevent scrolling during gameplay */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* ==========================================================================
+   Layout Container (Optimized for Vertical iPhone Screens)
+   ========================================================================== */
+.app-container {
+  width: 100%;
+  max-width: 480px;
+  height: 100%;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* ==========================================================================
+   Header & Mode Switcher
+   ========================================================================== */
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 4px;
+}
+
+.title-group h1 {
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.title-group .subtitle {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+}
+
+.mode-toggle {
+  display: flex;
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 3px;
+}
+
+.mode-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.mode-btn.active {
+  background: var(--accent-primary);
+  color: #fff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* ==========================================================================
+   Stats & Status Banner
+   ========================================================================== */
+.stats-bar {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.stat-card {
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 8px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.stat-value {
+  font-size: 1.1rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-value span {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.status-banner {
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 7px 12px;
+  text-align: center;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.25s ease, border-color 0.25s ease;
+}
+
+.status-banner.gameover {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: var(--danger-color);
+  color: #fca5a5;
+}
+
+.status-banner.victory {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: var(--success-color);
+  color: #6ee7b7;
+}
+
+/* ==========================================================================
+   Chessboard Area (Responsive Square Aspect Ratio)
+   ========================================================================== */
+.board-wrapper {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 0; /* Allows flex shrinking if screen is very short */
+}
+
+.board {
+  width: 100%;
+  max-width: min(92vw, 52vh);
+  aspect-ratio: 1 / 1;
+  display: grid;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 3px solid var(--border-color);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+  background-color: var(--border-color);
+  gap: 1px;
+}
+
+.square {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-weight: 700;
+  transition: background-color 0.15s ease, transform 0.1s ease;
+}
+
+.square:active {
+  transform: scale(0.95);
+}
+
+.square.light {
+  background-color: var(--sq-light);
+  color: #2d3748;
+}
+
+.square.dark {
+  background-color: var(--sq-dark);
+  color: #f7fafc;
+}
+
+/* Visited Squares */
+.square.visited.light {
+  background-color: var(--sq-visited-light);
+  color: rgba(30, 41, 59, 0.75);
+}
+
+.square.visited.dark {
+  background-color: var(--sq-visited-dark);
+  color: rgba(248, 250, 252, 0.8);
+}
+
+/* Subtle progress tint overlay on visited squares */
+.square.visited::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-color: var(--accent-primary);
+  opacity: var(--visit-alpha, 0.15);
+  pointer-events: none;
+}
+
+.step-num {
+  position: relative;
+  z-index: 1;
+  font-size: clamp(0.75rem, 3.2vw, 1rem);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Current Knight Position */
+.square.current {
+  background-color: var(--current-bg) !important;
+  color: #111827 !important;
+  box-shadow: inset 0 0 0 2px #fff;
+}
+
+.knight-icon {
+  width: 72%;
+  height: 72%;
+  z-index: 2;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.35));
+  animation: popIn 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes popIn {
+  0% { transform: scale(0.6); }
+  100% { transform: scale(1); }
+}
+
+/* Valid Next Moves Indicator */
+.square.valid-move::before {
+  content: "";
+  position: absolute;
+  width: 34%;
+  height: 34%;
+  border-radius: 50%;
+  background-color: var(--valid-dot);
+  box-shadow: 0 0 0 5px var(--valid-ring);
+  z-index: 2;
+  transition: transform 0.15s ease;
+}
+
+/* Hint Highlight (Warnsdorff's Optimal Move) */
+.square.hint-move {
+  box-shadow: inset 0 0 0 3px var(--hint-color) !important;
+  animation: pulseHint 1.2s infinite;
+}
+
+.square.hint-move::before {
+  background-color: var(--hint-color);
+  box-shadow: 0 0 0 6px rgba(59, 130, 246, 0.35);
+  transform: scale(1.25);
+}
+
+@keyframes pulseHint {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.18); }
+}
+
+/* ==========================================================================
+   Control Buttons (Bottom Thumb Zone)
+   ========================================================================== */
+.controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  padding-bottom: env(safe-area-inset-bottom, 6px);
+}
+
+.ctrl-btn {
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  border-radius: 12px;
+  padding: 12px 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, transform 0.1s ease, opacity 0.2s ease;
+}
+
+.ctrl-btn:active:not(:disabled) {
+  transform: scale(0.96);
+  background: var(--surface-hover);
+}
+
+.ctrl-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.ctrl-btn svg {
+  width: 18px;
+  height: 18px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.ctrl-btn.hint-btn svg {
+  color: #60a5fa;
+}
+
+.ctrl-btn.reset-btn svg {
+  color: #f87171;
+}
+
+/* Custom Confirmation Toast/Modal (No native confirm/alert) */
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  padding: 20px;
+}
+
+.confirm-overlay.open {
+  display: flex;
+}
+
+.confirm-box {
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  padding: 20px;
+  width: 100%;
+  max-width: 320px;
+  text-align: center;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+}
+
+.confirm-box p {
+  font-size: 0.95rem;
+  margin-bottom: 16px;
+  line-height: 1.4;
+}
+
+.confirm-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.confirm-actions button {
+  padding: 10px;
+  border-radius: 10px;
+  border: none;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.btn-cancel {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.btn-confirm {
+  background: var(--danger-color);
+  color: #fff;
+}
+  </style>
+</head>
+<body>
+
+  <div class="app-container">
+    <!-- Header & Board Size Toggle -->
+    <header>
+      <div class="title-group">
+        <h1>♞ Knight's Tour</h1>
+        <div class="subtitle">全マス1回ずつ踏破パズル（無音・オフライン）</div>
+      </div>
+      <div class="mode-toggle" role="group" aria-label="盤面サイズ切替">
+        <button type="button" class="mode-btn active" id="mode8Btn">8×8</button>
+        <button type="button" class="mode-btn" id="mode6Btn">6×6</button>
+      </div>
+    </header>
+
+<!-- Score & Best Record -->
+<div class="stats-bar">
+  <div class="stat-card">
+    <span class="stat-label">現在の手数</span>
+    <span class="stat-value" id="moveCounter">0 <span>/ 64</span></span>
+  </div>
+  <div class="stat-card">
+    <span class="stat-label">自己ベスト</span>
+    <span class="stat-value" id="bestScore">0 <span>/ 64</span></span>
+  </div>
+</div>
+
+<!-- Dynamic Instruction / Game State Banner -->
+<div class="status-banner" id="statusBanner">
+  好きなマスをタップしてスタート
+</div>
+
+<!-- Chessboard Grid -->
+<div class="board-wrapper">
+  <div class="board" id="board" role="grid" aria-label="チェス盤"></div>
+</div>
+
+<!-- Bottom Thumb Controls -->
+<div class="controls">
+  <button type="button" class="ctrl-btn" id="undoBtn" disabled>
+    <svg viewBox="0 0 24 24"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
+    <span>1手戻す</span>
+  </button>
+  <button type="button" class="ctrl-btn hint-btn" id="hintBtn" disabled>
+    <svg viewBox="0 0 24 24"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"/></svg>
+    <span>ヒント</span>
+  </button>
+  <button type="button" class="ctrl-btn reset-btn" id="resetBtn" disabled>
+    <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+    <span>リセット</span>
+  </button>
+</div>
+  </div>
+
+  <!-- Custom Reset Confirmation Modal -->
+  <div class="confirm-overlay" id="confirmModal">
+    <div class="confirm-box">
+      <p id="confirmText">現在のプレイをリセットしますか？</p>
+      <div class="confirm-actions">
+        <button type="button" class="btn-cancel" id="cancelResetBtn">キャンセル</button>
+        <button type="button" class="btn-confirm" id="confirmResetBtn">リセット</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /**
+     * Knight's Tour Offline Puzzle
+     * Completely silent, self-contained, localStorage-backed game logic.
+     */
+    (function () {
+      'use strict';
+
+      // All 8 possible L-shaped moves for a Chess Knight
+      const KNIGHT_MOVES = [
+        [-2, -1], [-2, 1],
+        [-1, -2], [-1, 2],
+        [1, -2],  [1, 2],
+        [2, -1],  [2, 1]
+      ];
+
+      // Crisp inline SVG for the Knight piece
+      const KNIGHT_SVG = `
+        <svg class="knight-icon" viewBox="0 0 45 45" xmlns="http://www.w3.org/2000/svg">
+          <g fill="#1f2937" stroke="#ffffff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M 22,10 C 32.5,11 38.5,18 38,39 L 15,39 C 15,30 25,32.5 23,18" />
+            <path d="M 24,18 C 24.38,20.91 18.45,25.37 16,27 C 13,29 13.18,31.34 11,31 C 9.958,30.06 12.41,27.96 11,28 C 10,28 11.19,29.23 10,30 C 9,30 5.997,31 6,26 C 6,24 12,14 12,14 C 12,14 13.89,12.1 14,10.5 C 13.27,9.506 13.5,8.5 13.5,7.5 C 14.5,6.5 16.5,10 16.5,10 L 18.5,10 C 18.5,10 19.28,8.008 21,7 C 22,7 22,10 22,10" />
+            <circle cx="15" cy="14.5" r="1.2" fill="#ffffff" stroke="none" />
+          </g>
+        </svg>
+      `;
+
+      // Game State
+      let boardSize = 8; // 8 or 6
+      let history = [];  // Array of { r, c } objects representing visited path
+      let hintSquare = null; // { r, c } or null
+      let pendingAction = null; // Callback for confirmation modal
+
+      // DOM Elements
+      const boardEl = document.getElementById('board');
+      const moveCounterEl = document.getElementById('moveCounter');
+      const bestScoreEl = document.getElementById('bestScore');
+      const statusBannerEl = document.getElementById('statusBanner');
+      const undoBtn = document.getElementById('undoBtn');
+      const hintBtn = document.getElementById('hintBtn');
+      const resetBtn = document.getElementById('resetBtn');
+      const mode8Btn = document.getElementById('mode8Btn');
+      const mode6Btn = document.getElementById('mode6Btn');
+      const confirmModal = document.getElementById('confirmModal');
+      const confirmText = document.getElementById('confirmText');
+      const cancelResetBtn = document.getElementById('cancelResetBtn');
+      const confirmResetBtn = document.getElementById('confirmResetBtn');
+
+      /**
+       * Retrieve best score from localStorage safely
+       */
+      function getBestScore(size) {
+        try {
+          const val = localStorage.getItem(`knights_tour_best_${size}`);
+          return val ? parseInt(val, 10) : 0;
+        } catch (e) {
+          return 0;
+        }
+      }
+
+      /**
+       * Save best score to localStorage safely
+       */
+      function saveBestScore(size, score) {
+        try {
+          const currentBest = getBestScore(size);
+          if (score > currentBest) {
+            localStorage.setItem(`knights_tour_best_${size}`, String(score));
+          }
+        } catch (e) {
+          // Ignore storage quota or private browsing errors
+        }
+      }
+
+      /**
+       * Check if coordinates are within board bounds
+       */
+      function isInside(r, c) {
+        return r >= 0 && r < boardSize && c >= 0 && c < boardSize;
+      }
+
+      /**
+       * Check if square (r, c) has already been visited in current run
+       */
+      function getStepNumber(r, c) {
+        const idx = history.findIndex(pos => pos.r = r && pos.c = c);
+        return idx = -1 ? 0 : idx + 1;
+      }
+
+      /**
+       * Calculate all valid unvisited knight moves from a given position (r, c)
+       */
+      function getValidMoves(r, c, customHistory = history) {
+        const moves = [];
+        for (const [dr, dc] of KNIGHT_MOVES) {
+          const nr = r + dr;
+          const nc = c + dc;
+          if (isInside(nr, nc)) {
+            const alreadyVisited = customHistory.some(pos => pos.r = nr && pos.c = nc);
+            if (!alreadyVisited) {
+              moves.push({ r: nr, c: nc });
+            }
+          }
+        }
+        return moves;
+      }
+
+      /**
+       * Warnsdorff's Rule Heuristic:
+       * Find the valid next move that has the FEWEST onward valid moves.
+       * Tie-breaking favors squares closer to the board corners/edges.
+       */
+      function calculateWarnsdorffHint() {
+        if (history.length = 0) return null;
+        const current = history[history.length - 1];
+        const candidates = getValidMoves(current.r, current.c);
+        if (candidates.length = 0) return null;
+
+        let bestMove = null;
+        let minDegree = Infinity;
+        let maxEdgeDist = -1;
+
+        const center = (boardSize - 1) / 2;
+
+        for (const cand of candidates) {
+          // Simulate moving to cand
+          const simulatedHistory = [...history, cand];
+          const onwardMoves = getValidMoves(cand.r, cand.c, simulatedHistory);
+          const degree = onwardMoves.length;
+
+          // Distance from center (tie-breaker: prefer edges/corners)
+          const edgeDist = Math.abs(cand.r - center) + Math.abs(cand.c - center);
+
+          if (degree < minDegree || (degree = minDegree && edgeDist > maxEdgeDist)) {
+            minDegree = degree;
+            maxEdgeDist = edgeDist;
+            bestMove = cand;
+          }
+        }
+        return bestMove;
+      }
+
+      /**
+       * Handle tapping/clicking a square on the board
+       */
+      function handleSquareClick(r, c) {
+        // First move: place the Knight anywhere
+        if (history.length = 0) {
+          history.push({ r, c });
+          hintSquare = null;
+          saveBestScore(boardSize, 1);
+          render();
+          return;
+        }
+
+        // Subsequent moves: must be in validMoves list
+        const current = history[history.length - 1];
+        const validMoves = getValidMoves(current.r, current.c);
+        const isValid = validMoves.some(m => m.r = r && m.c = c);
+
+        if (isValid) {
+          history.push({ r, c });
+          hintSquare = null;
+          saveBestScore(boardSize, history.length);
+          render();
+        }
+      }
+
+      /**
+       * Undo the last move
+       */
+      function undoMove() {
+        if (history.length > 0) {
+          history.pop();
+          hintSquare = null;
+          render();
+        }
+      }
+
+      /**
+       * Trigger Warnsdorff hint highlight
+       */
+      function showHint() {
+        if (history.length = 0) return;
+        hintSquare = calculateWarnsdorffHint();
+        render();
+      }
+
+      /**
+       * Open confirmation dialog before resetting mid-game
+       */
+      function requestReset(callback, message = '現在のプレイをリセットしますか？') {
+        const totalSquares = boardSize * boardSize;
+        // If game hasn't started or is already finished, reset immediately without modal
+        if (history.length <= 1 || history.length = totalSquares) {
+          callback();
+          return;
+        }
+        const current = history[history.length - 1];
+        if (getValidMoves(current.r, current.c).length = 0) {
+          callback();
+          return;
+        }
+
+        pendingAction = callback;
+        confirmText.textContent = message;
+        confirmModal.classList.add('open');
+      }
+
+      /**
+       * Switch between 8x8 and 6x6 modes
+       */
+      function switchMode(newSize) {
+        if (boardSize = newSize) return;
+        requestReset(() => {
+          boardSize = newSize;
+          history = [];
+          hintSquare = null;
+          mode8Btn.classList.toggle('active', boardSize = 8);
+          mode6Btn.classList.toggle('active', boardSize = 6);
+          render();
+        }, `${newSize}×${newSize}モードに切り替えますか？（現在の進行はリセットされます）`);
+      }
+
+      /**
+       * Render the entire UI & Board state
+       */
+      function render() {
+        const totalSquares = boardSize * boardSize;
+        const moveCount = history.length;
+        const best = getBestScore(boardSize);
+
+        // Update Counters
+        moveCounterEl.innerHTML = `${moveCount} <span>/ ${totalSquares}</span>`;
+        bestScoreEl.innerHTML = `${best} <span>/ ${totalSquares}</span>`;
+
+        // Determine current valid moves & game status
+        let validMoves = [];
+        let isVictory = false;
+        let isGameOver = false;
+
+        if (moveCount = 0) {
+          statusBannerEl.textContent = '好きなマスをタップしてスタート';
+          statusBannerEl.className = 'status-banner';
+        } else {
+          const current = history[moveCount - 1];
+          validMoves = getValidMoves(current.r, current.c);
+
+          if (moveCount = totalSquares) {
+            isVictory = true;
+            statusBannerEl.textContent = '🎉 完全制覇！全マス踏破おめでとうございます！';
+            statusBannerEl.className = 'status-banner victory';
+          } else if (validMoves.length = 0) {
+            isGameOver = true;
+            statusBannerEl.textContent = `行き止まり！（記録: ${moveCount}手）1手戻すかリセットできます`;
+            statusBannerEl.className = 'status-banner gameover';
+          } else {
+            statusBannerEl.textContent = `移動可能なマス: 残り ${validMoves.length} ヶ所`;
+            statusBannerEl.className = 'status-banner';
+          }
+        }
+
+        // Update Button States
+        undoBtn.disabled = moveCount = 0;
+        hintBtn.disabled = moveCount = 0 || isVictory || isGameOver;
+        resetBtn.disabled = moveCount = 0;
+
+        // Build Grid
+        boardEl.style.gridTemplateColumns = `repeat(${boardSize}, 1fr)`;
+        boardEl.style.gridTemplateRows = `repeat(${boardSize}, 1fr)`;
+        boardEl.innerHTML = '';
+
+        for (let r = 0; r < boardSize; r) {
+          for (let c = 0; c < boardSize; c) {
+            const sq = document.createElement('div');
+            const isLight = (r + c) % 2 = 0;
+            sq.className = `square ${isLight ? 'light' : 'dark'}`;
+
+            const step = getStepNumber(r, c);
+            const isCurrent = moveCount > 0 && history[moveCount - 1].r = r && history[moveCount - 1].c = c;
+            const isValid = validMoves.some(m => m.r = r && m.c = c);
+            const isHint = hintSquare && hintSquare.r = r && hintSquare.c = c;
+
+            if (isCurrent) {
+              sq.classList.add('current');
+              sq.innerHTML = KNIGHT_SVG;
+            } else if (step > 0) {
+              sq.classList.add('visited');
+              // Progressive subtle tint based on how late in the tour the square was visited
+              const progressRatio = step / totalSquares;
+              sq.style.setProperty('--visit-alpha', (0.06 + progressRatio * 0.24).toFixed(2));
+              const numSpan = document.createElement('span');
+              numSpan.className = 'step-num';
+              numSpan.textContent = step;
+              sq.appendChild(numSpan);
+            }
+
+            if (isValid) {
+              sq.classList.add('valid-move');
+            }
+
+            if (isHint) {
+              sq.classList.add('hint-move');
+            }
+
+            sq.addEventListener('click', () => handleSquareClick(r, c));
+            boardEl.appendChild(sq);
+          }
+        }
+      }
+
+      // Event Listeners
+      undoBtn.addEventListener('click', undoMove);
+      hintBtn.addEventListener('click', showHint);
+      resetBtn.addEventListener('click', () => {
+        requestReset(() => {
+          history = [];
+          hintSquare = null;
+          render();
+        });
+      });
+
+      mode8Btn.addEventListener('click', () => switchMode(8));
+      mode6Btn.addEventListener('click', () => switchMode(6));
+
+      cancelResetBtn.addEventListener('click', () => {
+        confirmModal.classList.remove('open');
+        pendingAction = null;
+      });
+
+      confirmResetBtn.addEventListener('click', () => {
+        confirmModal.classList.remove('open');
+        if (pendingAction) {
+          pendingAction();
+          pendingAction = null;
+        }
+      });
+
+      // Initialize on load
+      render();
+    })();
+  </script>
+
+</body>
+</html>
+
